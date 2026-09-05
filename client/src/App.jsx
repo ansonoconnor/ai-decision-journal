@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
+import AuthGate from "./components/AuthGate";
 import DecisionWorkspace from "./components/DecisionWorkspace";
 import DecisionList from "./components/DecisionList";
 
 import decisionService from "./application/DecisionService";
+import supabase from "./infrastructure/supabase/client";
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] =
+    useState(true);
+
   const [decisions, setDecisions] = useState([]);
-  const [selectedDecision, setSelectedDecision] = useState(null);
+  const [selectedDecision, setSelectedDecision] =
+    useState(null);
 
   async function loadDecision(decisionSummary) {
     if (!decisionSummary) {
@@ -29,7 +36,8 @@ function App() {
 
   async function refreshDecisions(selectedId = null) {
     try {
-      const summaries = await decisionService.getDecisions();
+      const summaries =
+        await decisionService.getDecisions();
 
       setDecisions(summaries);
 
@@ -40,12 +48,16 @@ function App() {
 
       const summaryToLoad =
         summaries.find(
-          (decision) => decision.identity.id === selectedId
+          (decision) =>
+            decision.identity.id === selectedId
         ) || summaries[0];
 
       await loadDecision(summaryToLoad);
     } catch (error) {
-      console.error("Failed to refresh decisions.", error);
+      console.error(
+        "Failed to refresh decisions.",
+        error
+      );
     }
   }
 
@@ -73,13 +85,98 @@ function App() {
     );
   }
 
+  async function handleSignOut() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error("Failed to sign out.", error);
+    }
+  }
+
   useEffect(() => {
-    refreshDecisions();
+    let isMounted = true;
+
+    async function initializeSession() {
+      const {
+        data: { session: existingSession },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.error(
+          "Failed to restore authentication session.",
+          error
+        );
+      }
+
+      setSession(existingSession);
+      setIsAuthLoading(false);
+    }
+
+    initializeSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setSession(nextSession);
+        setIsAuthLoading(false);
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setDecisions([]);
+      setSelectedDecision(null);
+      return;
+    }
+
+    refreshDecisions();
+  }, [session]);
+
+  if (isAuthLoading) {
+    return (
+      <div className="auth-loading">
+        Checking authentication...
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthGate />;
+  }
 
   return (
     <div className="app">
       <header className="header">
+        <div className="header-session">
+          <span className="header-session-identity">
+            {session.user.email}
+          </span>
+
+          <button
+            type="button"
+            className="header-sign-out"
+            onClick={handleSignOut}
+          >
+            Sign out
+          </button>
+        </div>
+
         <h1>AI Decision Journal</h1>
 
         <p className="subtitle">

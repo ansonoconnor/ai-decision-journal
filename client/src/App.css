@@ -675,3 +675,148 @@ button {
     width: auto;
   }
 }
+/* ==========================================================================
+   Authentication
+========================================================================== */
+
+.auth-gate,
+.auth-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: #0f172a;
+}
+
+.auth-loading {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 2.5rem;
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 18px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+}
+
+.auth-record-type {
+  margin-bottom: 0.8rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.auth-card h1 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 2rem;
+  letter-spacing: -0.03em;
+}
+
+.auth-description {
+  margin: 0.75rem 0 2rem;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.auth-form label span {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.auth-form input {
+  width: 100%;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 0.9rem 1rem;
+  font: inherit;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.auth-form button,
+.header-sign-out {
+  border: none;
+  border-radius: 10px;
+  padding: 0.85rem 1.2rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.auth-form button {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.auth-form button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.auth-form button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.auth-error {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  background: #450a0a;
+  color: #fecaca;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.header-session {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.header-session-identity {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.header-sign-out {
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e5e7eb;
+}
+
+.header-sign-out:hover {
+  background: #334155;
+}
