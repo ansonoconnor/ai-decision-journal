@@ -1,8 +1,8 @@
 # AI Decision Journal
 
-> **Enterprise decision intelligence workspace for governing, tracing, and learning from organizational decisions.**
+> **A system of record for consequential organizational decisions: what was decided, why, by whom, and what happened afterward.**
 
-**Built with:** React • Node.js • Express • Supabase • PostgreSQL
+**Built with:** React • Vite • Node.js • Express • Supabase • PostgreSQL
 
 ---
 
@@ -10,7 +10,7 @@
 
 AI Decision Journal is an enterprise decision intelligence application for capturing important organizational decisions as governed, durable records.
 
-Business decisions often begin in meetings, email threads, documents, dashboards, and AI conversations. The final decision may be recorded somewhere, but the reasoning that produced it, the people responsible for it, the changes it passed through, and the outcome that followed are often fragmented or lost.
+Business decisions often begin in meetings, email threads, documents, dashboards, and AI conversations. The final decision may be recorded somewhere, but the reasoning that produced it, the evidence available at the time, the people responsible for it, the changes it passed through, and the outcome that followed are often fragmented or lost.
 
 AI Decision Journal treats the **Decision itself as an organizational artifact**.
 
@@ -30,12 +30,17 @@ but also:
 - What happened after implementation?
 - What should the organization learn from the result?
 
+The underlying premise is that organizations should be able to preserve important decisions with the same durability they apply to documents, transactions, tickets, and other operational records.
+
 ---
 
 # Highlights
 
 - Structured enterprise Decision records
 - Searchable Decision Library
+- Authenticated workspace access
+- Supabase Auth session management
+- PostgreSQL Row Level Security
 - Explicit Decision lifecycle
 - Domain-enforced lifecycle transitions
 - Decision change detection
@@ -61,6 +66,8 @@ The screenshots below use **Northwind Logistics**, a fictional transportation an
 The application combines a searchable Decision Library with a structured workspace for reviewing and managing individual organizational decisions.
 
 Each Decision exists as more than a document or form. It is a persistent business record with identity, ownership, lifecycle state, governance information, operational outcomes, and historical context.
+
+The workspace is available only after authentication. Supabase Auth establishes the current application principal, and PostgreSQL Row Level Security provides the current database access boundary.
 
 ---
 
@@ -189,6 +196,8 @@ AI Decision Journal explores a simple architectural premise:
 > **Important organizational decisions should be treated as durable organizational assets.**
 
 That means preserving the Decision across its lifecycle rather than recording only its final state.
+
+AI is useful within that model, but it is not the system of record. AI can contribute recommendations and analysis; the durable artifact remains the organizational Decision.
 
 ---
 
@@ -341,6 +350,43 @@ The rejected attempt is not treated as a meaningful organizational event because
 
 ---
 
+# Identity, Access, and Decision Integrity
+
+AI Decision Journal separates several concerns that are easy to collapse into a single idea of "security."
+
+```text
+Authentication
+Who is interacting with the system?
+        │
+        ▼
+Authorization
+May this principal perform this action on this resource?
+        │
+        ▼
+Domain Validity
+Is the requested Decision transition legitimate?
+        │
+        ▼
+Attribution
+Who actually caused the accepted change?
+        │
+        ▼
+Auditability
+Can the organization reconstruct what happened?
+```
+
+The current implementation establishes the first boundary and part of the surrounding access infrastructure.
+
+Supabase Auth provides email/password authentication and session management. Authenticated browser requests carry the Supabase session context to the data layer, where PostgreSQL Row Level Security restricts Decision Journal data access to the authenticated role.
+
+The current RLS policies intentionally establish an **authenticated access boundary**, not final fine-grained authorization. Authenticated users are not yet differentiated by organization membership, Decision-specific relationship, or action-specific authority.
+
+That finer authorization model, together with authenticated actor attribution, remains future work.
+
+Lifecycle validity is already enforced independently in the domain layer. Authentication therefore does not make an otherwise invalid lifecycle transition valid.
+
+---
+
 # Features
 
 ## Decision Library
@@ -354,6 +400,23 @@ Current capabilities include:
 - Lifecycle status visibility
 - Decision selection
 - New Decision creation
+
+---
+
+## Authenticated Workspace
+
+The Decision workspace is protected by Supabase authentication.
+
+The application:
+
+- accepts email/password authentication
+- restores an existing authenticated session
+- observes authentication-state changes
+- prevents the Decision workspace from rendering without a session
+- clears Decision state when the user signs out
+- uses authenticated Supabase requests for persisted Decision data
+
+Database access is independently constrained by PostgreSQL Row Level Security rather than relying on the visibility of the React interface as the security boundary.
 
 ---
 
@@ -385,6 +448,8 @@ Each Decision can identify an accountable owner.
 Ownership is part of the Decision itself rather than informal metadata outside the record.
 
 Changes in ownership can also become part of Decision history.
+
+The current ownership field represents organizational responsibility within the Decision record. Fine-grained authorization linking authenticated principals to Decision-specific ownership remains a separate access-control concern.
 
 ---
 
@@ -436,7 +501,7 @@ to
 
 Decision History preserves structured before-and-after representations of changes.
 
-A lifecycle transition can retain:
+A lifecycle transition can retain information such as:
 
 ```text
 Field: status
@@ -458,6 +523,8 @@ Timeline and History serve related but distinct purposes:
 
 - **Timeline** communicates what happened.
 - **History** preserves the structured change representation.
+
+`Current User` is currently a placeholder actor representation in the lifecycle service. Replacing that placeholder with authenticated actor provenance is part of the planned attribution work.
 
 ---
 
@@ -493,35 +560,102 @@ The goal is to make organizational experience reusable rather than allowing it t
 
 # Architecture
 
-AI Decision Journal uses layered boundaries to separate presentation, application coordination, domain behavior, repository access, persistence mapping, and infrastructure.
+AI Decision Journal separates authentication, presentation, application coordination, domain behavior, repository access, persistence mapping, and database enforcement.
+
+The normal Decision read/write path does not require the React client to proxy Decision persistence through Express.
 
 ```text
+Supabase Auth
+        │
+        ▼
+Authenticated Session / JWT
+        │
+        ▼
 React Presentation
         │
         ▼
-Application Services
+DecisionService
         │
         ▼
-Domain
+Domain Logic
         │
         ▼
 Repository Boundary
         │
         ▼
-Persistence Mapping
+DecisionPersistence
         │
         ▼
-Supabase / PostgreSQL
+Supabase Browser Client
+        │
+        ▼
+PostgreSQL / Row Level Security
 ```
+
+Supabase validates the authenticated session context used by the data request, while PostgreSQL RLS provides the database access boundary.
+
+Node.js and Express are present in the repository for server-side capabilities, but normal Decision loading and persistence currently follow the authenticated browser-to-Supabase path shown above.
+
+This distinction is intentional: a server hop is not itself a security model. Authority must be enforced at a trusted boundary.
+
+---
+
+## Authentication Boundary
+
+`AuthGate` establishes the application's current sign-in boundary.
+
+Conceptually:
+
+```text
+Email + Password
+        │
+        ▼
+Supabase Auth
+        │
+        ▼
+Authenticated Session
+        │
+        ▼
+React Auth State
+        │
+        ▼
+Decision Workspace
+```
+
+The Supabase browser client automatically uses the authenticated session when making data requests.
+
+At the database:
+
+```text
+Unauthenticated / anon
+        │
+        └── Decision Journal access denied
+
+Authenticated
+        │
+        └── current authenticated RLS policies apply
+```
+
+The current policies deliberately answer:
+
+> Is this request authenticated?
+
+They do not yet answer:
+
+> Is this authenticated principal authorized to perform this particular action on this particular Decision?
+
+That is the next access-control layer.
 
 ---
 
 ## Presentation Layer
 
-React components are responsible for displaying and editing Decision information.
+React components are responsible for authentication presentation and for displaying and editing Decision information.
 
 ```text
 App.jsx
+│
+├── AuthGate
 │
 ├── DecisionList
 │
@@ -547,6 +681,8 @@ App.jsx
 ```
 
 Presentation components do not directly own persistence behavior or lifecycle rules.
+
+The authentication gate controls what the interface renders, while database RLS provides the independent persisted-data boundary.
 
 ---
 
@@ -592,6 +728,8 @@ Lifecycle events represent accepted changes.
 
 Lifecycle projections translate those events into durable timeline and history representations.
 
+Authentication and database access do not replace these domain rules. An authenticated request can still propose an invalid Decision transition, and the domain can reject it.
+
 ---
 
 ## Repository Boundary
@@ -626,6 +764,10 @@ decision_history
 decision_approvals
 decision_tags
 ```
+
+Row Level Security is enabled across these Decision Journal tables.
+
+The current policies remove anonymous Decision data access and permit access through the authenticated role. Organization-, role-, and resource-specific policies are intentionally not represented as complete.
 
 ---
 
@@ -674,6 +816,18 @@ Important decisions deserve durable representation rather than disappearing into
 
 A lifecycle should represent real organizational progression rather than arbitrary labels that can be changed without constraint.
 
+### Identity and authority are different concerns
+
+Establishing who a user is does not establish everything that user is allowed to do.
+
+Authentication, authorization, domain validity, attribution, and auditability are modeled as distinct concerns.
+
+### The UI is not the authority boundary
+
+Interface state can improve the user experience, but hiding or displaying a control does not determine whether the underlying operation is permitted.
+
+Persisted-data access must be enforced independently at a trusted boundary.
+
 ### History should describe what actually happened
 
 Rejected actions should not contaminate the organizational record with changes that never became valid Decision states.
@@ -705,6 +859,9 @@ The project emphasizes:
 - Translating business processes into explicit software models
 - Modeling lifecycle state as a domain concern
 - Separating editable UI state from persisted organizational state
+- Establishing authenticated application identity
+- Applying PostgreSQL Row Level Security at the persistence boundary
+- Distinguishing authentication from authorization and domain validity
 - Enforcing valid workflow progression
 - Detecting meaningful changes between persisted and edited records
 - Translating domain changes into human-readable organizational history
@@ -715,13 +872,47 @@ The project emphasizes:
 
 The objective is not simply to demonstrate React development.
 
-It is to demonstrate how business concepts such as **ownership, governance, lifecycle, history, implementation, and learning** can become explicit parts of a software system.
+It is to demonstrate how business concepts such as **identity, ownership, governance, lifecycle, history, implementation, and learning** can become explicit parts of a software system.
 
 ---
 
 # Engineering Challenges
 
 The project explores several problems common to enterprise application development.
+
+## Moving from Represented Users to Authenticated Principals
+
+The original prototype could represent owners, reviewers, approvers, and a generic `Current User`, but those representations were not connected to authenticated application identity.
+
+Supabase Auth now establishes a real authenticated principal and session before the Decision workspace becomes available.
+
+The database access model was correspondingly moved away from anonymous Decision Journal policies to RLS policies scoped to the authenticated role.
+
+This establishes the identity boundary while leaving fine-grained organizational and resource authorization as a distinct next problem.
+
+---
+
+## Separating Authentication from Authorization
+
+Authentication answers:
+
+```text
+Who are you?
+```
+
+Authorization answers:
+
+```text
+May you perform this action on this resource?
+```
+
+The current implementation establishes authentication and authenticated database access.
+
+It deliberately does not claim that all required role-, organization-, approval-, or Decision-specific authorization rules have been implemented.
+
+Keeping those concerns separate prevents descriptive fields such as Owner or Approver from being mistaken for enforced authority.
+
+---
 
 ## Separating Working State from Persisted State
 
@@ -736,6 +927,8 @@ The application therefore distinguishes the editable working representation from
 Lifecycle status cannot be treated as an unrestricted text field.
 
 Valid transitions are modeled in the domain and checked during the save process.
+
+Authentication does not bypass lifecycle integrity. A known user can still request an invalid state transition.
 
 ---
 
@@ -753,6 +946,8 @@ React components present and collect information, but lifecycle validity should 
 
 The lifecycle therefore exists in shared domain code.
 
+Similarly, rendering an authenticated workspace is not treated as sufficient database protection; persisted access is independently constrained through RLS.
+
 ---
 
 ## Preserving Human Accountability Around AI
@@ -760,6 +955,8 @@ The lifecycle therefore exists in shared domain code.
 AI recommendations are useful only when organizations can distinguish them from the people and processes responsible for actual decisions.
 
 The governance model preserves that distinction explicitly.
+
+Authenticated actor attribution is a planned extension of this principle.
 
 ---
 
@@ -778,12 +975,18 @@ Outcome and lesson structures extend the record beyond the moment of approval.
 - React
 - Vite
 
+### Authentication
+
+- Supabase Auth
+- Authenticated session management
+- JWT-backed Supabase request context
+
 ### Application
 
 - JavaScript application services
 - Repository abstractions
 
-### Backend
+### Server-Side Capabilities
 
 - Node.js
 - Express
@@ -792,6 +995,7 @@ Outcome and lesson structures extend the record beyond the moment of approval.
 
 - Supabase
 - PostgreSQL
+- Row Level Security
 
 ### Architecture
 
@@ -803,6 +1007,7 @@ Outcome and lesson structures extend the record beyond the moment of approval.
 - Lifecycle Modeling
 - Difference Detection
 - Persistence Mapping
+- Authenticated Data Boundary
 
 ---
 
@@ -813,23 +1018,26 @@ AI Decision Journal is one component within a broader organizational intelligenc
 ```text
 Knowledge Assistant
 Organizational Knowledge
+"What does the organization know?"
         │
         ▼
 AI Decision Journal
 Organizational Decisions
+"What did the organization decide, and why?"
         │
         ▼
 SynapseFlow
 Trusted Organizational Execution
+"Is the consequential action eligible to happen?"
 ```
 
 The projects explore different but related organizational problems:
 
 **Knowledge Assistant** focuses on what the organization knows.
 
-**AI Decision Journal** focuses on what the organization decides and why.
+**AI Decision Journal** focuses on what the organization decides, what justified that judgment, and how the Decision evolves over time.
 
-**SynapseFlow** explores how trusted organizational work moves into execution.
+**SynapseFlow** explores how trusted organizational work moves from judgment into consequential execution.
 
 The systems are designed as distinct architectural responsibilities rather than a single monolithic application.
 
@@ -855,6 +1063,12 @@ The systems are designed as distinct architectural responsibilities rather than 
 - Lifecycle event construction
 - Timeline generation
 - Decision history generation
+- Supabase email/password authentication
+- Authenticated session restoration
+- Authenticated workspace boundary
+- PostgreSQL Row Level Security
+- Authenticated-only Decision Journal data access
+- Version-controlled database access migration
 - Supabase persistence
 - Repository abstraction
 - Persistence mapping
@@ -866,15 +1080,18 @@ The systems are designed as distinct architectural responsibilities rather than 
 
 Potential future development includes:
 
+- Organizational membership and resource-level authorization
+- Decision-specific ownership and approval authority
+- Authenticated actor attribution
+- Expanded approval workflows
 - Knowledge Assistant evidence integration
 - Evidence search and attachment workflows
-- Expanded approval workflows
-- Identity and role-based access control
-- Organizational user attribution
 - Decision analytics
 - Cross-decision reporting
 - Notification and review workflows
 - Cross-product integration
+
+The immediate security direction is intentionally narrow: move from **authenticated** access to explicit **authorized** access without turning Decision Journal into a generalized identity platform.
 
 ---
 
@@ -889,7 +1106,7 @@ cd client
 npm install
 ```
 
-### Backend
+### Server
 
 ```bash
 cd server
@@ -900,7 +1117,7 @@ npm install
 
 ## Start
 
-### Backend
+### Server
 
 ```bash
 cd server
@@ -945,7 +1162,7 @@ The screenshots use a fictional organizational scenario for demonstration purpos
 
 # About This Project
 
-AI Decision Journal is a portfolio implementation exploring enterprise AI, workflow systems, decision governance, and organizational memory.
+AI Decision Journal is a portfolio implementation exploring enterprise AI, workflow systems, decision governance, organizational memory, and trustworthy application boundaries.
 
 The project began with a simple question:
 
@@ -953,7 +1170,9 @@ The project began with a simple question:
 
 The resulting application treats decisions as governed records that can accumulate context, evidence, ownership, recommendations, human judgment, lifecycle history, operational outcomes, and lessons over time.
 
-The deeper engineering focus is the translation of organizational behavior into explicit software boundaries: what constitutes state, which transitions are valid, what becomes history, what remains a working edit, who remains accountable, and how past decisions can become useful organizational knowledge.
+The deeper engineering focus is the translation of organizational behavior into explicit software boundaries: what constitutes state, which transitions are valid, what becomes history, what remains a working edit, who is interacting with the system, where access is enforced, who remains accountable, and how past decisions can become useful organizational knowledge.
+
+The current security architecture makes an important distinction: proving identity is necessary, but identity alone does not prove authority. Authentication is implemented; fine-grained authorization and authenticated actor attribution remain deliberate next layers.
 
 ---
 
@@ -970,6 +1189,7 @@ Please do not redistribute substantial portions of the project without permissio
 **Anson O'Connor**
 
 AI Implementation & Workflow Systems Architect
+
 Austin, Texas
 
 **LinkedIn:** [linkedin.com/in/ansonoconnor](https://www.linkedin.com/in/ansonoconnor)
