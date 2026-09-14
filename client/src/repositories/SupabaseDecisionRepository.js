@@ -25,6 +25,14 @@ export default class SupabaseDecisionRepository extends DecisionRepository {
   }
 
   /**
+   * Returns the organization associated with the
+   * current authenticated membership context.
+   */
+  async getCurrentOrganizationId() {
+    return this.persistence.getCurrentOrganizationId();
+  }
+
+  /**
    * Returns all decision summaries.
    */
   async getAll() {

@@ -2,6 +2,7 @@ class DecisionPersistenceMapper {
   static toDecisionRow(decision) {
     return {
       id: decision.identity.id,
+      organization_id: decision.organizationId,
       title: decision.identity.title,
       status: decision.identity.status,
       priority: decision.identity.priority,
@@ -98,6 +99,8 @@ class DecisionPersistenceMapper {
     tags = [],
   }) {
     return {
+      organizationId: decision.organization_id,
+
       identity: {
         id: decision.id,
         title: decision.title,

@@ -11,6 +11,29 @@ class DecisionPersistence {
     this.db = client;
   }
 
+  async getCurrentOrganizationId() {
+    const { data, error } = await this.db
+      .from("organization_memberships")
+      .select("organization_id")
+      .limit(2);
+
+    if (error) throw error;
+
+    if (!data?.length) {
+      throw new Error(
+        "The authenticated user does not belong to an organization."
+      );
+    }
+
+    if (data.length > 1) {
+      throw new Error(
+        "Decision creation requires an explicit organization when multiple memberships exist."
+      );
+    }
+
+    return data[0].organization_id;
+  }
+
   async getAll() {
     const { data, error } = await this.db
       .from("decisions")
