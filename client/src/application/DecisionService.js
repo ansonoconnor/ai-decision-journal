@@ -44,7 +44,12 @@ class DecisionService {
    * Creates a new Decision using the canonical DecisionFactory.
    */
   async createDecision() {
-    const decision = DecisionFactory.create();
+    const organizationId =
+      await this.repository.getCurrentOrganizationId();
+
+    const decision = DecisionFactory.create({
+      organizationId,
+    });
 
     return this.repository.create(decision);
   }

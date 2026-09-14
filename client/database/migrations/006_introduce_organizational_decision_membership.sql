@@ -4,38 +4,49 @@
 -- Introduce Organizational Decision Membership
 --
 -- Purpose:
--- Establish the minimum organizational model required to move from
--- authenticated access toward resource-level authorization.
+-- Connect authenticated Decision Journal users and Decisions to the existing
+-- organizational identity model.
 --
--- This migration models organizations, authenticated user membership, and the
--- organization that owns each Decision. It does not replace the authenticated
--- access policies introduced by Migration 005. Organization-scoped RLS belongs
--- to the next migration.
+-- The database already represents organizations through public.organizations,
+-- whose canonical identifiers are text values. Decision Journal reuses that
+-- existing organizational boundary rather than introducing a parallel
+-- organization model.
+--
+-- This migration:
+-- - Creates authenticated-user organization memberships
+-- - Adds organizational ownership to Decisions
+-- - Assigns existing Decisions to the existing Momentum Co. organization
+-- - Preserves the broad authenticated access policies from Migration 005
+--
+-- Organization-scoped authorization is introduced by Migration 007.
 -- ============================================================================
 
 -- ============================================================================
--- Organizations
+-- Existing Organization Context
 -- ============================================================================
+--
+-- Decision Journal joins the existing organizational model through the
+-- canonical Momentum Co. organization identifier.
 
-CREATE TABLE public.organizations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL
-    CHECK (char_length(btrim(name)) > 0),
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.organizations
-ENABLE ROW LEVEL SECURITY;
-
--- No client policy is added here. Organizational access will be introduced
--- together with membership-aware RLS in the next authorization migration.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.organizations
+    WHERE id = 'org-momentum-co'
+  ) THEN
+    RAISE EXCEPTION
+      'Required organization org-momentum-co was not found.';
+  END IF;
+END
+$$;
 
 -- ============================================================================
 -- Organization Memberships
 -- ============================================================================
 
 CREATE TABLE public.organization_memberships (
-  organization_id uuid NOT NULL
+  organization_id text NOT NULL
     REFERENCES public.organizations(id)
     ON DELETE CASCADE,
   user_id uuid NOT NULL
@@ -54,15 +65,15 @@ ON public.organization_memberships(user_id);
 ALTER TABLE public.organization_memberships
 ENABLE ROW LEVEL SECURITY;
 
--- Membership rows remain inaccessible through the browser until the next
--- migration defines the policies that use auth.uid().
+-- Membership rows intentionally remain inaccessible through the browser until
+-- Migration 007 introduces authenticated self-membership visibility.
 
 -- ============================================================================
 -- Decision Organization Ownership
 -- ============================================================================
 
 ALTER TABLE public.decisions
-ADD COLUMN organization_id uuid
+ADD COLUMN organization_id text
 REFERENCES public.organizations(id)
 ON DELETE RESTRICT;
 
@@ -77,41 +88,31 @@ COMMENT ON COLUMN public.decisions.organization_id IS
 -- ============================================================================
 --
 -- Migration 005 allowed every authenticated user to access every Decision.
--- Preserve that existing demo environment by placing current Decisions and
--- current authenticated users into one bootstrap organization.
+-- Preserve the current demo environment by connecting existing Decisions and
+-- authenticated users to the existing Momentum Co. organization.
 --
 -- Existing users receive admin membership because authenticated users
--- previously had unrestricted read/write access. This records the current
--- behavior without yet enforcing it as the final authorization policy.
+-- previously had unrestricted read/write access. Migration 007 will constrain
+-- access by membership while leaving role-specific mutation authority for a
+-- later milestone.
 
-DO $$
-DECLARE
-  bootstrap_organization_id uuid;
-BEGIN
-  INSERT INTO public.organizations (name)
-  VALUES ('Decision Journal Demo Organization')
-  RETURNING id INTO bootstrap_organization_id;
+UPDATE public.decisions
+SET organization_id = 'org-momentum-co'
+WHERE organization_id IS NULL;
 
-  UPDATE public.decisions
-  SET organization_id = bootstrap_organization_id
-  WHERE organization_id IS NULL;
+INSERT INTO public.organization_memberships (
+  organization_id,
+  user_id,
+  role
+)
+SELECT
+  'org-momentum-co',
+  users.id,
+  'admin'
+FROM auth.users AS users
+ON CONFLICT (organization_id, user_id) DO NOTHING;
 
-  INSERT INTO public.organization_memberships (
-    organization_id,
-    user_id,
-    role
-  )
-  SELECT
-    bootstrap_organization_id,
-    users.id,
-    'admin'
-  FROM auth.users AS users
-  ON CONFLICT (organization_id, user_id) DO NOTHING;
-END
-$$;
-
--- organization_id is intentionally nullable during this transitional commit
--- so the current Decision creation path continues to work. The next migration
--- will make organization context explicit during creation, backfill any rows
--- created in the interim, enforce NOT NULL, and replace broad authenticated
--- access with organization-scoped RLS.
+-- organization_id intentionally remains nullable during this transitional
+-- migration. Migration 007 will backfill any Decisions created during the
+-- transition, enforce NOT NULL, and replace broad authenticated RLS with
+-- organization-scoped access.

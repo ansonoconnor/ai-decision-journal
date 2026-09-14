@@ -21,10 +21,18 @@ import {
 } from "../domain/decisionLifecycle.js";
 
 export default class DecisionFactory {
-  static create() {
+  static create({ organizationId } = {}) {
+    if (!organizationId) {
+      throw new Error(
+        "DecisionFactory requires an organizationId."
+      );
+    }
+
     const id = crypto.randomUUID();
 
     return {
+      organizationId,
+
       identity: {
         id,
         title: "Untitled Decision",
