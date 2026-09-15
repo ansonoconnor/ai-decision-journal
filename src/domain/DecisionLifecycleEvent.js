@@ -50,6 +50,7 @@ export function createDecisionLifecycleEvent({
   type,
   description,
   actor = "System",
+  actorUserId = null,
   occurredAt = new Date().toISOString(),
   metadata = {},
 }) {
@@ -58,6 +59,7 @@ export function createDecisionLifecycleEvent({
     type,
     description,
     actor,
+    actorUserId,
     occurredAt,
     metadata,
   };
@@ -67,6 +69,7 @@ export function createLifecycleEventFromDifference(
   difference,
   {
     actor = "System",
+    actorUserId = null,
     occurredAt = new Date().toISOString(),
   } = {}
 ) {
@@ -92,6 +95,7 @@ export function createLifecycleEventFromDifference(
       `${difference.label} changed from ` +
       `"${previousValue}" to "${currentValue}".`,
     actor,
+    actorUserId,
     occurredAt,
     metadata: {
       field: difference.field,

@@ -127,7 +127,6 @@ class DecisionPersistence {
     const tables = [
       "decision_tags",
       "decision_approvals",
-      "decision_history",
       "decision_timeline",
       "decision_evidence",
     ];
@@ -153,7 +152,6 @@ class DecisionPersistence {
     const tables = [
       "decision_tags",
       "decision_approvals",
-      "decision_history",
       "decision_timeline",
       "decision_evidence",
       "decisions",
@@ -218,9 +216,31 @@ class DecisionPersistence {
 
     if (!rows.length) return;
 
+    const historyIds = rows.map((row) => row.id);
+
+    const {
+      data: existingRows = [],
+      error: existingRowsError,
+    } = await this.db
+      .from("decision_history")
+      .select("id")
+      .in("id", historyIds);
+
+    if (existingRowsError) throw existingRowsError;
+
+    const existingIds = new Set(
+      existingRows.map((row) => row.id)
+    );
+
+    const newRows = rows.filter(
+      (row) => !existingIds.has(row.id)
+    );
+
+    if (!newRows.length) return;
+
     const { error } = await this.db
       .from("decision_history")
-      .upsert(rows);
+      .insert(newRows);
 
     if (error) throw error;
   }

@@ -62,8 +62,7 @@ class DecisionService {
    */
   async updateDecision(
     id,
-    proposedDecision,
-    actor = "Current User"
+    proposedDecision
   ) {
     const persistedDecision =
       await this.repository.getById(id);
@@ -81,6 +80,9 @@ class DecisionService {
       persistedDecision,
       proposedDecision
     );
+
+    const actor =
+      await this.repository.getCurrentActor();
 
     const lifecycleEvents = differences.map((difference) =>
       this.createLifecycleEventFromDifference(
@@ -199,7 +201,8 @@ class DecisionService {
         `'${difference.previousValue}' to ` +
         `'${difference.currentValue}'.`,
 
-      actor,
+      actor: actor.label,
+      actorUserId: actor.userId,
 
       metadata: {
         field: difference.field,

@@ -12,14 +12,25 @@ import decisions from "../data/decisions";
  */
 export default class MockDecisionRepository extends DecisionRepository {
   constructor(
-    organizationId = "mock-organization"
+    organizationId = "mock-organization",
+    actor = {
+      userId: "mock-authenticated-user",
+      label: "Mock Authenticated User",
+    }
   ) {
     super();
 
     this.organizationId = organizationId;
+    this.actor = actor;
 
     // Clone the data so mutations don't affect the imported module.
     this.decisions = structuredClone(decisions);
+  }
+
+  async getCurrentActor() {
+    return {
+      ...this.actor,
+    };
   }
 
   async getCurrentOrganizationId() {
