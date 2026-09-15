@@ -25,6 +25,30 @@ export default class SupabaseDecisionRepository extends DecisionRepository {
   }
 
   /**
+   * Returns canonical provenance for the current
+   * authenticated user.
+   */
+  async getCurrentActor() {
+    const {
+      data: { user },
+      error,
+    } = await browserSupabase.auth.getUser();
+
+    if (error) throw error;
+
+    if (!user) {
+      throw new Error(
+        "The authenticated actor could not be resolved."
+      );
+    }
+
+    return {
+      userId: user.id,
+      label: user.email || user.id,
+    };
+  }
+
+  /**
    * Returns the organization associated with the
    * current authenticated membership context.
    */

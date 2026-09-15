@@ -13,6 +13,12 @@
  * never on a specific persistence implementation.
  */
 export default class DecisionRepository {
+  async getCurrentActor() {
+    throw new Error(
+      "getCurrentActor() must be implemented."
+    );
+  }
+
   async getCurrentOrganizationId() {
     throw new Error(
       "getCurrentOrganizationId() must be implemented."

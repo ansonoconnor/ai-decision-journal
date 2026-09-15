@@ -45,6 +45,7 @@ export function projectLifecycleEventToHistory(event) {
     previousValue,
     currentValue,
     updatedBy: event.actor,
+    updatedByUserId: event.actorUserId,
     updatedAt: event.occurredAt,
   };
 }

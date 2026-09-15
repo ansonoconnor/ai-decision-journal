@@ -65,6 +65,7 @@ class DecisionPersistenceMapper {
       previous_value: entry.previousValue,
       current_value: entry.currentValue,
       updated_by: entry.updatedBy,
+      actor_user_id: entry.updatedByUserId ?? null,
       updated_at: entry.updatedAt,
     }));
   }
@@ -148,6 +149,7 @@ class DecisionPersistenceMapper {
         previousValue: entry.previous_value,
         currentValue: entry.current_value,
         updatedBy: entry.updated_by,
+        updatedByUserId: entry.actor_user_id,
         updatedAt: entry.updated_at,
       })),
 
